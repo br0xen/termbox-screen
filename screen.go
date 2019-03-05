@@ -5,8 +5,13 @@ import (
 	"os"
 	"runtime"
 	"syscall"
+	"time"
 
 	termbox "github.com/nsf/termbox-go"
+)
+
+const (
+	NoRefresh = 0
 )
 
 type Screen interface {
@@ -25,21 +30,19 @@ type Manager struct {
 	screens         map[int]Screen
 	displayScreenId int
 	events          chan termbox.Event
+
+	running     bool
+	refreshRate time.Duration
 }
 
 func NewManager() *Manager {
 	m := Manager{
-		defaultFg: termbox.ColorWhite,
-		defaultBg: termbox.ColorBlack,
-		events:    make(chan termbox.Event),
-		screens:   make(map[int]Screen),
+		defaultFg:   termbox.ColorWhite,
+		defaultBg:   termbox.ColorBlack,
+		events:      make(chan termbox.Event),
+		screens:     make(map[int]Screen),
+		refreshRate: NoRefresh,
 	}
-	// Add the default user-input provider
-	m.AddEventProvider(func(e chan termbox.Event) {
-		for {
-			e <- termbox.PollEvent()
-		}
-	})
 	return &m
 }
 
@@ -80,10 +83,6 @@ func (m *Manager) InitializeScreen(id int, b Bundle) error {
 	return m.screens[id].Initialize(b)
 }
 
-func (m *Manager) AddEventProvider(provider func(chan termbox.Event)) {
-	go provider(m.events)
-}
-
 func (m *Manager) Loop() error {
 	if len(m.screens) == 0 {
 		return errors.New("Loop cannot run without screens")
@@ -91,7 +90,9 @@ func (m *Manager) Loop() error {
 	if err := termbox.Init(); err != nil {
 		return err
 	}
+	m.running = true
 	termbox.SetOutputMode(termbox.Output256)
+	go m.pollUserEvents()
 	// We always start display the first screen added
 	m.layoutAndDrawScreen()
 	for {
@@ -125,8 +126,37 @@ func (m *Manager) Loop() error {
 			m.layoutAndDrawScreen()
 		}
 	}
+	m.running = false
 	termbox.Close()
 	return nil
+}
+
+func (m *Manager) SendNoneEvent() {
+	m.SendEvent(termbox.Event{Type: termbox.EventNone})
+}
+
+func (m *Manager) SendEvent(t termbox.Event) {
+	m.events <- t
+}
+
+func (m *Manager) pollUserEvents() {
+	for m.running {
+		m.SendEvent(termbox.PollEvent())
+	}
+}
+
+func (m *Manager) SetRefreshRate(t time.Duration) {
+	m.refreshRate = t
+	go m.pollRefreshEvents()
+}
+
+func (m *Manager) pollRefreshEvents() {
+	if m.refreshRate > 0 {
+		for m.running {
+			time.Sleep(m.refreshRate)
+			m.SendNoneEvent()
+		}
+	}
 }
 
 func (m *Manager) handleKeyEvent(event termbox.Event) int {
