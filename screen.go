@@ -3,7 +3,6 @@ package termboxScreen
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"syscall"
@@ -64,6 +63,13 @@ func (m *Manager) AddScreen(s Screen) {
 	if len(m.screens) == 1 {
 		m.SetDisplayScreen(s.Id())
 	}
+}
+
+// AddAndInitializeScreen adds a screen just like AddScreen, but then
+// calls it's 'Initialize' function with a blank bundle
+func (m *Manager) AddAndInitializeScreen(s Screen) error {
+	m.AddScreen(s)
+	return m.InitializeScreen(s.Id(), Bundle{})
 }
 
 func (m *Manager) GetScreens() map[int]Screen {
@@ -157,7 +163,6 @@ func (m *Manager) SetRefreshRate(t time.Duration) {
 func (m *Manager) pollRefreshEvents() {
 	if m.refreshRate > time.Microsecond {
 		for m.running {
-			ioutil.WriteFile("./log", []byte(time.Now().Format(time.RFC3339)), 0644)
 			time.Sleep(m.refreshRate)
 			m.SendNoneEvent()
 		}
