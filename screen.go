@@ -2,6 +2,8 @@ package termboxScreen
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"runtime"
 	"syscall"
@@ -43,6 +45,11 @@ func NewManager() *Manager {
 		screens:     make(map[int]Screen),
 		refreshRate: NoRefresh,
 	}
+	if err := termbox.Init(); err != nil {
+		fmt.Println("Error initializing termbox")
+		return nil
+	}
+	termbox.SetOutputMode(termbox.Output256)
 	return &m
 }
 
@@ -87,11 +94,7 @@ func (m *Manager) Loop() error {
 	if len(m.screens) == 0 {
 		return errors.New("Loop cannot run without screens")
 	}
-	if err := termbox.Init(); err != nil {
-		return err
-	}
 	m.running = true
-	termbox.SetOutputMode(termbox.Output256)
 	go m.pollUserEvents()
 	// We always start display the first screen added
 	m.layoutAndDrawScreen()
@@ -127,6 +130,7 @@ func (m *Manager) Loop() error {
 		}
 	}
 	m.running = false
+	close(m.events)
 	termbox.Close()
 	return nil
 }
@@ -151,8 +155,9 @@ func (m *Manager) SetRefreshRate(t time.Duration) {
 }
 
 func (m *Manager) pollRefreshEvents() {
-	if m.refreshRate > 0 {
+	if m.refreshRate > time.Microsecond {
 		for m.running {
+			ioutil.WriteFile("./log", []byte(time.Now().Format(time.RFC3339)), 0644)
 			time.Sleep(m.refreshRate)
 			m.SendNoneEvent()
 		}
