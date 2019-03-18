@@ -137,7 +137,7 @@ func (m *Manager) Loop() error {
 	}
 	m.running = false
 	close(m.events)
-	termbox.Close()
+	m.Close()
 	return nil
 }
 
@@ -147,6 +147,10 @@ func (m *Manager) SendNoneEvent() {
 
 func (m *Manager) SendEvent(t termbox.Event) {
 	m.events <- t
+}
+
+func (m *Manager) Close() {
+	termbox.Close()
 }
 
 func (m *Manager) pollUserEvents() {
