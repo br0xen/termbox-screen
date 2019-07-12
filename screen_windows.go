@@ -1,12 +1,9 @@
-// +build !windows
+// +build windows
 package termboxScreen
 
 import (
 	"errors"
 	"fmt"
-	"os"
-	"runtime"
-	"syscall"
 	"time"
 
 	termbox "github.com/nsf/termbox-go"
@@ -110,13 +107,6 @@ func (m *Manager) Loop() error {
 		if event.Type == termbox.EventKey {
 			if event.Key == termbox.KeyCtrlC {
 				break
-			} else if event.Key == termbox.KeyCtrlZ {
-				if runtime.GOOS != "windows" {
-					process, _ := os.FindProcess(os.Getpid())
-					termbox.Close()
-					process.Signal(syscall.SIGSTOP)
-					termbox.Init()
-				}
 			} else {
 				newScreenIndex := m.handleKeyEvent(event)
 				if err := m.SetDisplayScreen(newScreenIndex); err != nil {
